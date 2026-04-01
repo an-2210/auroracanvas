@@ -1,62 +1,317 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  Bold, Italic, Underline, Pipette, MousePointer
+  MousePointer
 } from "lucide-react";
 import SpotlightCard from "@/components/reactbits/SpotlightCard.jsx";
+import { useBuilderStore } from "@/store/builderStore.js";
+import { COMPONENT_REGISTRY } from "@/lib/registry.jsx";
 
 const tabs = ["Content", "Style", "Layout"];
 
-const ColorSwatch = ({ color, active, label }) => (
-  <motion.button
-    whileTap={{ scale: 0.85 }}
-    whileHover={{ scale: 1.15, y: -2 }}
-    className="flex flex-col items-center gap-1"
-    title={label}
-  >
-    <div
-      className={`w-7 h-7 rounded-lg border-2 transition-all duration-300 ${
-        active ? "border-primary glow-purple" : "border-border/20 hover:border-border/40"
-      }`}
-      style={{ backgroundColor: color === "transparent" ? "transparent" : color }}
-    />
-  </motion.button>
-);
-
-const SliderControl = ({ label, value, max = 100, unit = "px" }) => (
+const SliderControl = ({ label, value, max = 200, unit = "px", onChange }) => (
   <div>
     <div className="flex justify-between mb-2">
       <span className="prop-label mb-0">{label}</span>
       <span className="text-[11px] font-mono text-muted-foreground/60">{value}{unit}</span>
     </div>
-    <div className="relative h-1.5 rounded-full overflow-hidden" style={{ background: "hsl(var(--glass-bg) / 0.6)" }}>
-      <motion.div
-        className="absolute inset-y-0 left-0 rounded-full"
-        style={{ background: "linear-gradient(90deg, hsl(260 100% 68%), hsl(330 90% 62%))" }}
-        initial={{ width: 0 }}
-        animate={{ width: `${(value / max) * 100}%` }}
-        transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
-      />
-      <motion.div
-        className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-foreground border-2 border-background cursor-pointer"
-        style={{ left: `calc(${(value / max) * 100}% - 8px)`, boxShadow: "0 0 6px hsl(260 100% 68% / 0.3)" }}
-        whileHover={{ scale: 1.3 }}
-        whileTap={{ scale: 0.9 }}
+    <div className="flex items-center gap-3">
+      <input 
+        type="range" 
+        min="0" 
+        max={max} 
+        value={value || 0} 
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full accent-primary bg-background/50 h-1.5 rounded-lg appearance-none"
       />
     </div>
   </div>
 );
 
-const PropertiesPanel = ({ selectedElement }) => {
-  const [activeTab, setActiveTab] = useState("Style");
+const ColorControl = ({ label, value, onChange }) => (
+  <div className="flex items-center justify-between mb-3">
+    <span className="prop-label mb-0">{label}</span>
+    <div className="flex items-center gap-2">
+      <div 
+        className="w-6 h-6 rounded-md border border-border/40 shadow-sm"
+        style={{ backgroundColor: value }}
+      />
+      <input 
+        type="text" 
+        value={value || ""} 
+        onChange={(e) => onChange(e.target.value)}
+        className="prop-input text-xs w-20 py-1 px-2"
+        placeholder="#000000"
+      />
+    </div>
+  </div>
+);
+
+const PropertiesPanel = () => {
+  const [activeTab, setActiveTab] = useState("Content");
+  
+  const elements = useBuilderStore(state => state.elements);
+  const selectedElementId = useBuilderStore(state => state.selectedElementId);
+  const updateElement = useBuilderStore(state => state.updateElement);
+  const previewMode = useBuilderStore(state => state.previewMode);
+
+  if (previewMode) return null;
+
+  const selectedElement = elements.find(el => el.id === selectedElementId);
+  const elementConfig = selectedElement ? COMPONENT_REGISTRY[selectedElement.type] : null;
+
+  const handlePropChange = (key, value) => {
+    if (!selectedElement) return;
+    updateElement(selectedElement.id, { [key]: value });
+  };
+
+  const renderContentControls = () => {
+    if (!selectedElement) return null;
+    const styleKeys = ['color', 'backgroundColor', 'titleColor', 'subtitleColor', 'descriptionColor', 'textColor', 'fontSize', 'fontWeight', 'textAlign', 'borderRadius'];
+    const layoutKeys = ['paddingTop', 'paddingBottom', 'paddingX', 'paddingY', 'width', 'columns', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight', 'buttonPosition'];
+    
+    // Everything else is treated as content text mapping
+    const activeKeys = Object.keys(selectedElement.props).filter(k => !styleKeys.includes(k) && !layoutKeys.includes(k));
+
+    if (activeKeys.length === 0) return <div className="text-xs text-muted-foreground/50">No content properties available.</div>;
+
+    return activeKeys.map(key => {
+      let displayName = key.replace(/([A-Z])/g, ' $1').trim();
+      if (key === 'src') displayName = 'Image URL (src)';
+
+      return (
+      <div key={key} className="mb-4">
+        <label className="prop-label capitalize">{displayName}</label>
+        {typeof selectedElement.props[key] === 'boolean' ? (
+          <div className="flex items-center gap-2 mt-2">
+             <input type="checkbox" checked={selectedElement.props[key]} onChange={(e) => handlePropChange(key, e.target.checked)} className="w-4 h-4 accent-primary" />
+             <span className="text-xs text-muted-foreground">{selectedElement.props[key] ? 'On' : 'Off'}</span>
+          </div>
+        ) : key.toLowerCase().includes('desc') || key === 'content' ? (
+          <textarea
+            className="prop-input resize-none h-24 text-xs leading-relaxed"
+            value={selectedElement.props[key]}
+            onChange={(e) => handlePropChange(key, e.target.value)}
+          />
+        ) : (
+          <input
+            className="prop-input text-xs"
+            value={selectedElement.props[key]}
+            onChange={(e) => handlePropChange(key, e.target.value)}
+          />
+        )}
+      </div>
+    )});
+  };
+
+  const renderStyleControls = () => {
+    if (!selectedElement) return null;
+    const styleKeys = ['color', 'backgroundColor', 'titleColor', 'subtitleColor', 'descriptionColor', 'textColor', 'fontSize', 'fontWeight', 'textAlign', 'borderRadius'];
+    const activeKeys = Object.keys(selectedElement.props).filter(k => styleKeys.includes(k));
+
+    if (activeKeys.length === 0) return <div className="text-xs text-muted-foreground/50">No style properties available.</div>;
+
+    return (
+      <div className="space-y-4">
+        {/* Colors */}
+        {activeKeys.filter(k => k.toLowerCase().includes('color')).length > 0 && (
+          <SpotlightCard className="glass-inset p-3 rounded-xl" spotlightColor="rgba(139, 92, 246, 0.08)">
+            <label className="prop-label mb-3">Colors</label>
+            {activeKeys.filter(k => k.toLowerCase().includes('color')).map(key => (
+              <ColorControl 
+                key={key} 
+                label={key.replace(/([A-Z])/g, ' $1').trim()} 
+                value={selectedElement.props[key]} 
+                onChange={(val) => handlePropChange(key, val)} 
+              />
+            ))}
+          </SpotlightCard>
+        )}
+
+        {/* Typography */}
+        {activeKeys.includes('fontSize') && (
+           <SpotlightCard className="glass-inset p-3 rounded-xl" spotlightColor="rgba(139, 92, 246, 0.08)">
+             <label className="prop-label">Typography</label>
+             <div className="grid grid-cols-2 gap-2 mt-2">
+                <div>
+                  <span className="text-[9px] text-muted-foreground/50 uppercase tracking-wider">Size (px)</span>
+                  <input type="number" className="prop-input text-xs mt-1" value={selectedElement.props.fontSize} onChange={(e) => handlePropChange('fontSize', Number(e.target.value))} />
+                </div>
+                {activeKeys.includes('fontWeight') && (
+                  <div>
+                    <span className="text-[9px] text-muted-foreground/50 uppercase tracking-wider">Weight</span>
+                    <select className="prop-input text-xs mt-1" value={selectedElement.props.fontWeight} onChange={(e) => handlePropChange('fontWeight', e.target.value)}>
+                      <option value="bold">Bold</option>
+                      <option value="semibold">Semi</option>
+                      <option value="medium">Medium</option>
+                      <option value="normal">Regular</option>
+                    </select>
+                  </div>
+                )}
+             </div>
+           </SpotlightCard>
+        )}
+
+        {/* Text Align */}
+        {activeKeys.includes('textAlign') && (
+          <div>
+            <label className="prop-label">Alignment</label>
+            <div className="flex gap-1">
+              {[
+                { icon: AlignLeft, value: 'left' },
+                { icon: AlignCenter, value: 'center' },
+                { icon: AlignRight, value: 'right' },
+              ].map(({ icon: Icon, value }) => (
+                <motion.button
+                  key={value}
+                  onClick={() => handlePropChange('textAlign', value)}
+                  whileTap={{ scale: 0.88 }}
+                  className={`icon-btn flex-1 flex justify-center ${selectedElement.props.textAlign === value ? "active" : ""}`}
+                >
+                  <Icon className="w-4 h-4" />
+                </motion.button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Border Radius */}
+        {activeKeys.includes('borderRadius') && (
+          <SliderControl 
+            label="Border Radius" 
+            value={selectedElement.props.borderRadius} 
+            max={50} 
+            onChange={(val) => handlePropChange('borderRadius', val)} 
+          />
+        )}
+      </div>
+    );
+  };
+
+  const renderLayoutControls = () => {
+    if (!selectedElement) return null;
+    const layoutKeys = ['paddingTop', 'paddingBottom', 'paddingX', 'paddingY', 'width', 'columns', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight', 'buttonPosition'];
+    const activeKeys = Object.keys(selectedElement.props).filter(k => layoutKeys.includes(k));
+
+    if (activeKeys.length === 0) return <div className="text-xs text-muted-foreground/50">No layout properties available.</div>;
+
+    return (
+      <div className="space-y-4">
+        {activeKeys.includes('columns') && (
+           <SliderControl 
+              label="Columns" 
+              value={selectedElement.props.columns} 
+              max={4} 
+              unit=""
+              onChange={(val) => handlePropChange('columns', val)} 
+           />
+        )}
+        
+        {activeKeys.includes('buttonPosition') && (
+          <div>
+            <label className="prop-label">Button Position</label>
+            <select className="prop-input text-xs mt-1" value={selectedElement.props.buttonPosition} onChange={(e) => handlePropChange('buttonPosition', e.target.value)}>
+              <option value="left">Left</option>
+              <option value="center">Center / Inside</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+        )}
+        
+        {activeKeys.includes('paddingTop') && (
+          <SliderControl 
+            label="Padding Top" 
+            value={selectedElement.props.paddingTop} 
+            max={200} 
+            onChange={(val) => handlePropChange('paddingTop', val)} 
+          />
+        )}
+        
+        {activeKeys.includes('paddingBottom') && (
+          <SliderControl 
+            label="Padding Bottom" 
+            value={selectedElement.props.paddingBottom} 
+            max={200} 
+            onChange={(val) => handlePropChange('paddingBottom', val)} 
+          />
+        )}
+
+        {activeKeys.includes('paddingX') && (
+          <SliderControl 
+            label="Horizontal Padding" 
+            value={selectedElement.props.paddingX} 
+            max={100} 
+            onChange={(val) => handlePropChange('paddingX', val)} 
+          />
+        )}
+
+        {activeKeys.includes('paddingY') && (
+          <SliderControl 
+            label="Vertical Padding" 
+            value={selectedElement.props.paddingY} 
+            max={100} 
+            onChange={(val) => handlePropChange('paddingY', val)} 
+          />
+        )}
+
+        {activeKeys.includes('marginTop') && (
+          <SliderControl 
+            label="Margin Top" 
+            value={selectedElement.props.marginTop} 
+            max={200} 
+            onChange={(val) => handlePropChange('marginTop', val)} 
+          />
+        )}
+
+        {activeKeys.includes('marginBottom') && (
+          <SliderControl 
+            label="Margin Bottom" 
+            value={selectedElement.props.marginBottom} 
+            max={200} 
+            onChange={(val) => handlePropChange('marginBottom', val)} 
+          />
+        )}
+
+        {activeKeys.includes('marginLeft') && (
+          <SliderControl 
+            label="Margin Left" 
+            value={selectedElement.props.marginLeft} 
+            max={200} 
+            onChange={(val) => handlePropChange('marginLeft', val)} 
+          />
+        )}
+
+        {activeKeys.includes('marginRight') && (
+          <SliderControl 
+            label="Margin Right" 
+            value={selectedElement.props.marginRight} 
+            max={200} 
+            onChange={(val) => handlePropChange('marginRight', val)} 
+          />
+        )}
+
+        {activeKeys.includes('width') && (
+          <div>
+            <label className="prop-label">Width</label>
+            <input 
+              className="prop-input text-xs" 
+              value={selectedElement.props.width} 
+              onChange={(e) => handlePropChange('width', e.target.value)} 
+            />
+          </div>
+         )}
+      </div>
+    );
+  };
 
   return (
     <motion.aside
-      initial={{ x: 300, opacity: 0 }}
+      initial={{ x: 280, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      transition={{ duration: 0.7, ease: [0.23, 1, 0.32, 1], delay: 0.15 }}
-      className="glass w-[280px] flex-shrink-0 flex flex-col overflow-hidden h-full"
+      exit={{ x: 280, opacity: 0 }}
+      transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1], delay: 0.15 }}
+      className="glass w-[280px] flex-shrink-0 flex flex-col overflow-hidden h-full z-10"
     >
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-border/20">
@@ -123,180 +378,9 @@ const PropertiesPanel = ({ selectedElement }) => {
               transition={{ duration: 0.25 }}
               className="space-y-5 pt-4"
             >
-              {activeTab === "Content" && (
-                <>
-                  <div>
-                    <label className="prop-label">Text Content</label>
-                    <textarea
-                      className="prop-input resize-none h-24 text-xs leading-relaxed"
-                      defaultValue="Build Beautiful Websites Visually"
-                    />
-                  </div>
-                  <div>
-                    <label className="prop-label">Link URL</label>
-                    <input className="prop-input text-xs" placeholder="https://example.com" />
-                  </div>
-                  <div>
-                    <label className="prop-label">Alt Text</label>
-                    <input className="prop-input text-xs" placeholder="Describe the element..." />
-                  </div>
-                </>
-              )}
-
-              {activeTab === "Style" && (
-                <>
-                  {/* Typography */}
-                  <SpotlightCard className="glass-inset p-3 rounded-xl" spotlightColor="rgba(139, 92, 246, 0.08)">
-                    <label className="prop-label">Typography</label>
-                    <select className="prop-input text-xs mb-2">
-                      <option>Inter</option>
-                      <option>Roboto</option>
-                      <option>Playfair Display</option>
-                      <option>Space Grotesk</option>
-                    </select>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <span className="text-[9px] text-muted-foreground/50 uppercase tracking-wider">Size</span>
-                        <input className="prop-input text-xs mt-1" defaultValue="36px" />
-                      </div>
-                      <div>
-                        <span className="text-[9px] text-muted-foreground/50 uppercase tracking-wider">Weight</span>
-                        <select className="prop-input text-xs mt-1">
-                          <option>700 Bold</option>
-                          <option>600 Semi</option>
-                          <option>500 Medium</option>
-                          <option>400 Regular</option>
-                        </select>
-                      </div>
-                    </div>
-                  </SpotlightCard>
-
-                  {/* Formatting */}
-                  <div>
-                    <label className="prop-label">Text Formatting</label>
-                    <div className="flex gap-1">
-                      {[
-                        { icon: Bold, active: true },
-                        { icon: Italic, active: false },
-                        { icon: Underline, active: false },
-                      ].map(({ icon: Icon, active }, i) => (
-                        <motion.button
-                          key={i}
-                          whileTap={{ scale: 0.88 }}
-                          whileHover={{ scale: 1.08 }}
-                          className={`icon-btn ${active ? "active" : ""}`}
-                        >
-                          <Icon className="w-4 h-4" />
-                        </motion.button>
-                      ))}
-                      <div className="w-px h-8 bg-border/20 mx-1" />
-                      {[AlignLeft, AlignCenter, AlignRight, AlignJustify].map((Icon, i) => (
-                        <motion.button
-                          key={i}
-                          whileTap={{ scale: 0.88 }}
-                          whileHover={{ scale: 1.08 }}
-                          className={`icon-btn ${i === 1 ? "active" : ""}`}
-                        >
-                          <Icon className="w-4 h-4" />
-                        </motion.button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Colors */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="prop-label mb-0">Text Color</span>
-                      <motion.button className="icon-btn p-1" whileHover={{ scale: 1.2, rotate: 15 }} whileTap={{ scale: 0.9 }}>
-                        <Pipette className="w-3 h-3" />
-                      </motion.button>
-                    </div>
-                    <div className="flex gap-2 flex-wrap">
-                      {[
-                        { c: "#1e293b", l: "Dark" },
-                        { c: "#3b82f6", l: "Blue" },
-                        { c: "#8b5cf6", l: "Purple" },
-                        { c: "#ec4899", l: "Pink" },
-                        { c: "#ef4444", l: "Red" },
-                        { c: "#f59e0b", l: "Amber" },
-                        { c: "#10b981", l: "Green" },
-                        { c: "#ffffff", l: "White" },
-                      ].map(({ c, l }, i) => (
-                        <ColorSwatch key={c} color={c} active={i === 0} label={l} />
-                      ))}
-                    </div>
-                  </div>
-
-                  <SliderControl label="Border Radius" value={12} max={50} />
-                  <SliderControl label="Opacity" value={100} max={100} unit="%" />
-                </>
-              )}
-
-              {activeTab === "Layout" && (
-                <>
-                  {/* Box Model Visual */}
-                  <SpotlightCard className="glass-inset p-3 rounded-xl" spotlightColor="rgba(139, 92, 246, 0.08)">
-                    <label className="prop-label">Box Model</label>
-                    <div className="mt-2 relative border border-border/20 rounded-lg p-3 text-center">
-                      <span className="text-[9px] font-mono text-muted-foreground/40 absolute top-1 left-2">margin</span>
-                      <div className="border border-primary/20 rounded-md p-3 bg-primary/5">
-                        <span className="text-[9px] font-mono text-primary/40 absolute top-8 left-5">padding</span>
-                        <div className="border border-primary/30 rounded px-4 py-2 text-[11px] font-mono text-primary">
-                          Content
-                        </div>
-                      </div>
-                      {/* Values */}
-                      <span className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] font-mono text-muted-foreground/50 bg-card px-1">0</span>
-                      <span className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 text-[10px] font-mono text-muted-foreground/50 bg-card px-1">0</span>
-                      <span className="absolute top-8 left-1/2 -translate-x-1/2 text-[10px] font-mono text-primary/60">64</span>
-                      <span className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] font-mono text-primary/60">64</span>
-                    </div>
-                  </SpotlightCard>
-
-                  <SliderControl label="Padding" value={64} max={200} />
-                  <SliderControl label="Margin Top" value={0} max={200} />
-                  <SliderControl label="Margin Bottom" value={0} max={200} />
-
-                  <div>
-                    <label className="prop-label">Width</label>
-                    <select className="prop-input text-xs">
-                      <option>Full Width (100%)</option>
-                      <option>Auto</option>
-                      <option>Fixed Width</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="prop-label">Display</label>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {["Block", "Flex", "Grid"].map((d, i) => (
-                        <motion.button
-                          key={d}
-                          whileTap={{ scale: 0.92 }}
-                          className={`text-[11px] font-medium py-2 rounded-xl transition-all duration-300 ${
-                            i === 0
-                              ? "text-primary"
-                              : "text-muted-foreground hover:text-foreground"
-                          }`}
-                          style={
-                            i === 0
-                              ? {
-                                  background: "hsl(260 100% 68% / 0.1)",
-                                  border: "1px solid hsl(260 100% 68% / 0.2)",
-                                }
-                              : {
-                                  background: "hsl(var(--glass-bg) / 0.4)",
-                                  border: "1px solid hsl(var(--glass-shine) / 0.06)",
-                                }
-                          }
-                        >
-                          {d}
-                        </motion.button>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
+              {activeTab === "Content" && renderContentControls()}
+              {activeTab === "Style" && renderStyleControls()}
+              {activeTab === "Layout" && renderLayoutControls()}
             </motion.div>
           )}
         </AnimatePresence>

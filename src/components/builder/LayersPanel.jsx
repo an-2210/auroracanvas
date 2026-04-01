@@ -1,48 +1,29 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ChevronRight, Eye, EyeOff,
-  RectangleHorizontal, Type, MousePointer2, Image, Layers
+  ChevronRight,
+  RectangleHorizontal, Type, MousePointer2, Image, Layers, Columns3, Layout
 } from "lucide-react";
+import { useBuilderStore } from "@/store/builderStore.js";
+import { COMPONENT_REGISTRY } from "@/lib/registry.jsx";
 
-const layerTree = [
-  {
-    id: "page", label: "Page", icon: Layers,
-    children: [
-      {
-        id: "hero", label: "Hero Section", icon: RectangleHorizontal,
-        children: [
-          { id: "heading", label: "Heading", icon: Type },
-          { id: "subtext", label: "Paragraph", icon: Type },
-          { id: "cta-btn", label: "CTA Button", icon: MousePointer2 },
-        ],
-      },
-      {
-        id: "text-block", label: "Text Block", icon: Type,
-        children: [
-          { id: "h2", label: "Subheading", icon: Type },
-          { id: "desc", label: "Description", icon: Type },
-        ],
-      },
-      {
-        id: "cards", label: "Cards Grid", icon: RectangleHorizontal,
-        children: [
-          { id: "card-1", label: "Card — Fast", icon: Image },
-          { id: "card-2", label: "Card — Beautiful", icon: Image },
-          { id: "card-3", label: "Card — Responsive", icon: Image },
-        ],
-      },
-    ],
-  },
-];
+const getIconForType = (type) => {
+  switch (type) {
+    case 'HeroSection': return RectangleHorizontal;
+    case 'TextBlock': return Layout;
+    case 'CardsGrid': return Columns3;
+    case 'Heading': return Type;
+    case 'Paragraph': return Type;
+    case 'Button': return MousePointer2;
+    case 'Image': return Image;
+    default: return Layers;
+  }
+};
 
-const LayerNode = ({
-  item, depth, selectedId, onSelect,
-}) => {
-  const [open, setOpen] = useState(depth < 2);
-  const [visible, setVisible] = useState(true);
-  const hasChildren = item.children && item.children.length > 0;
-  const isSelected = selectedId === item.id;
+const LayerNode = ({ element, depth, selectedId, onSelect }) => {
+  const isSelected = selectedId === element.id;
+  const config = COMPONENT_REGISTRY[element.type];
+  const Icon = getIconForType(element.type);
 
   return (
     <div>
@@ -61,76 +42,32 @@ const LayerNode = ({
               }
             : {}),
         }}
-        onClick={() => onSelect(item.id)}
+        onClick={() => onSelect(element.id)}
         whileTap={{ scale: 0.98 }}
       >
-        {hasChildren ? (
-          <motion.button
-            onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-            animate={{ rotate: open ? 90 : 0 }}
-            transition={{ duration: 0.2 }}
-            className="p-0.5"
-          >
-            <ChevronRight className="w-3 h-3" />
-          </motion.button>
-        ) : (
-          <div className="w-4" />
-        )}
-        <item.icon className="w-3.5 h-3.5 flex-shrink-0" />
-        <span className="flex-1 truncate font-medium">{item.label}</span>
-        <motion.button
-          onClick={(e) => { e.stopPropagation(); setVisible(!visible); }}
-          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
-          whileHover={{ scale: 1.2 }}
-        >
-          {visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3 text-destructive/60" />}
-        </motion.button>
+        <div className="w-4" />
+        <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+        <span className="flex-1 truncate font-medium">{config?.name || element.type}</span>
       </motion.div>
-
-      <AnimatePresence initial={false}>
-        {open && hasChildren && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
-            className="overflow-hidden"
-          >
-            {/* Indent line */}
-            <div className="relative">
-              <div
-                className="absolute top-0 bottom-0 w-px bg-border/15"
-                style={{ left: `${depth * 14 + 18}px` }}
-              />
-              {item.children.map((child, i) => (
-                <motion.div
-                  key={child.id}
-                  initial={{ opacity: 0, x: -6 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.03 }}
-                >
-                  <LayerNode item={child} depth={depth + 1} selectedId={selectedId} onSelect={onSelect} />
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };
 
-const LayersPanel = ({
-  selectedElement, onSelectElement,
-}) => {
+const LayersPanel = () => {
   const [collapsed, setCollapsed] = useState(false);
+  const elements = useBuilderStore(state => state.elements);
+  const selectedElementId = useBuilderStore(state => state.selectedElementId);
+  const selectElement = useBuilderStore(state => state.selectElement);
+  const previewMode = useBuilderStore(state => state.previewMode);
+
+  if (previewMode) return null;
 
   return (
     <motion.div
       initial={{ y: 20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5, delay: 0.25 }}
-      className="glass mt-2"
+      className="glass mt-2 z-10"
     >
       <button
         onClick={() => setCollapsed(!collapsed)}
@@ -154,13 +91,16 @@ const LayersPanel = ({
             className="overflow-hidden"
           >
             <div className="px-2 pb-3 max-h-52 overflow-y-auto scrollbar-thin">
-              {layerTree.map((item) => (
+              {elements.length === 0 && (
+                <div className="text-[10px] text-muted-foreground/50 px-3 py-2 text-center">Empty Canvas</div>
+              )}
+              {elements.map((item) => (
                 <LayerNode
                    key={item.id}
-                   item={item}
+                   element={item}
                    depth={0}
-                   selectedId={selectedElement}
-                   onSelect={onSelectElement}
+                   selectedId={selectedElementId}
+                   onSelect={selectElement}
                 />
               ))}
             </div>

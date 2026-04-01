@@ -1,62 +1,106 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useDraggable } from "@dnd-kit/core";
 import {
   Type, Heading1, Heading2, AlignLeft, MousePointer2, RectangleHorizontal,
   Image, Video, Layout, Columns3, PanelTop, CreditCard, PanelBottom,
   ChevronRight, GripVertical, Search, Plus
 } from "lucide-react";
+import { useBuilderStore } from "@/store/builderStore.js";
 
 const elementGroups = [
+  {
+    title: "Layout & Sections",
+    color: "hsl(185 100% 55%)",
+    items: [
+      { label: "Hero Section", type: "HeroSection", icon: RectangleHorizontal, desc: "Full-width intro block" },
+      { label: "Text Block", type: "TextBlock", icon: Layout, desc: "Content wrapper" },
+      { label: "Cards Grid", type: "CardsGrid", icon: Columns3, desc: "Multi-column grid" },
+    ],
+  },
   {
     title: "Text",
     color: "hsl(260 100% 68%)",
     items: [
-      { label: "Heading", icon: Heading1, desc: "Main title" },
-      { label: "Subheading", icon: Heading2, desc: "Section title" },
-      { label: "Paragraph", icon: AlignLeft, desc: "Body text" },
+      { label: "Heading", type: "Heading", icon: Heading1, desc: "Main title" },
+      { label: "Subheading", type: "Subheading", icon: Heading2, desc: "Section title" },
+      { label: "Paragraph", type: "Paragraph", icon: AlignLeft, desc: "Body text" },
     ],
   },
   {
     title: "Buttons",
     color: "hsl(330 90% 62%)",
     items: [
-      { label: "Primary", icon: MousePointer2, desc: "Call to action" },
-      { label: "Secondary", icon: MousePointer2, desc: "Alternate action" },
+      { label: "Primary Button", type: "Button", icon: MousePointer2, desc: "Call to action" },
+      { label: "Secondary Button", type: "SecondaryButton", icon: MousePointer2, desc: "Alternate action" },
     ],
   },
   {
     title: "Media",
     color: "hsl(210 100% 60%)",
     items: [
-      { label: "Image", icon: Image, desc: "Photo or graphic" },
-      { label: "Video", icon: Video, desc: "Video embed" },
-    ],
-  },
-  {
-    title: "Layout",
-    color: "hsl(185 100% 55%)",
-    items: [
-      { label: "Section", icon: RectangleHorizontal, desc: "Full-width block" },
-      { label: "Container", icon: Layout, desc: "Centered wrapper" },
-      { label: "Columns", icon: Columns3, desc: "Multi-column grid" },
+      { label: "Image", type: "Image", icon: Image, desc: "Photo or graphic" },
     ],
   },
   {
     title: "Components",
     color: "hsl(45 100% 60%)",
     items: [
-      { label: "Navbar", icon: PanelTop, desc: "Navigation bar" },
-      { label: "Card", icon: CreditCard, desc: "Content card" },
-      { label: "Footer", icon: PanelBottom, desc: "Page footer" },
+      { label: "Navbar", type: "Navbar", icon: PanelTop, desc: "Navigation bar" },
+      { label: "Footer", type: "Footer", icon: PanelBottom, desc: "Page footer" },
     ],
   },
 ];
 
+const DraggableItem = ({ item, groupColor }) => {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `sidebar-${item.type}`,
+    data: {
+      type: item.type,
+      isSidebarItem: true,
+    },
+  });
+
+  return (
+    <motion.div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      layout
+      className={`element-item group/item cursor-grab ${isDragging ? "opacity-40" : ""}`}
+      whileHover={{ x: 3 }}
+      whileTap={{ scale: 0.97, cursor: "grabbing" }}
+    >
+      <GripVertical className="w-3 h-3 text-muted-foreground/20 opacity-0 group-hover/item:opacity-100 transition-opacity" />
+      <div
+        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+        style={{
+          background: `${groupColor.replace(")", " / 0.1)")}`,
+          border: `1px solid ${groupColor.replace(")", " / 0.15)")}`,
+        }}
+      >
+        <item.icon className="w-4 h-4" style={{ color: groupColor }} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-foreground/90">{item.label}</div>
+        <div className="text-[10px] text-muted-foreground/60">{item.desc}</div>
+      </div>
+      <Plus className="w-3.5 h-3.5 text-muted-foreground/30 opacity-0 group-hover/item:opacity-100 transition-opacity" />
+    </motion.div>
+  );
+};
+
+
 const ElementsPanel = () => {
   const [openGroups, setOpenGroups] = useState(
-    new Set(["Text", "Layout", "Components"])
+    new Set(["Layout & Sections", "Text", "Buttons", "Media", "Components"])
   );
   const [search, setSearch] = useState("");
+  const previewMode = useBuilderStore((state) => state.previewMode);
+
+  if (previewMode) return null;
 
   const toggleGroup = (title) => {
     setOpenGroups((prev) => {
@@ -77,10 +121,11 @@ const ElementsPanel = () => {
 
   return (
     <motion.aside
-      initial={{ x: -300, opacity: 0 }}
+      initial={{ x: -268, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      transition={{ duration: 0.7, ease: [0.23, 1, 0.32, 1], delay: 0.1 }}
-      className="glass w-[268px] flex-shrink-0 flex flex-col overflow-hidden h-full"
+      exit={{ x: -268, opacity: 0 }}
+      transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1], delay: 0.1 }}
+      className="glass w-[268px] flex-shrink-0 flex flex-col overflow-hidden h-full z-10"
     >
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-border/20">
@@ -141,33 +186,8 @@ const ElementsPanel = () => {
                   className="overflow-hidden"
                 >
                   <div className="space-y-0.5 pb-1">
-                    {group.items.map((item, i) => (
-                      <motion.div
-                        key={item.label}
-                        initial={{ opacity: 0, x: -8 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.04 }}
-                        draggable
-                        className="element-item group/item"
-                        whileHover={{ x: 3 }}
-                        whileTap={{ scale: 0.97 }}
-                      >
-                        <GripVertical className="w-3 h-3 text-muted-foreground/20 opacity-0 group-hover/item:opacity-100 transition-opacity" />
-                        <div
-                          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                          style={{
-                            background: `${group.color.replace(")", " / 0.1)")}`,
-                            border: `1px solid ${group.color.replace(")", " / 0.15)")}`,
-                          }}
-                        >
-                          <item.icon className="w-4 h-4" style={{ color: group.color }} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-foreground/90">{item.label}</div>
-                          <div className="text-[10px] text-muted-foreground/60">{item.desc}</div>
-                        </div>
-                        <Plus className="w-3.5 h-3.5 text-muted-foreground/30 opacity-0 group-hover/item:opacity-100 transition-opacity" />
-                      </motion.div>
+                    {group.items.map((item) => (
+                      <DraggableItem key={item.label} item={item} groupColor={group.color} />
                     ))}
                   </div>
                 </motion.div>

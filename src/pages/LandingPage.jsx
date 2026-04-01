@@ -95,9 +95,6 @@ const LandingPage = () => {
         </Magnet>
 
         <div className="flex items-center gap-6">
-          <motion.a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors" whileHover={{ y: -1 }}>Features</motion.a>
-          <motion.a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors" whileHover={{ y: -1 }}>Pricing</motion.a>
-          <motion.a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors" whileHover={{ y: -1 }}>Docs</motion.a>
         </div>
       </motion.nav>
 
@@ -165,7 +162,7 @@ const LandingPage = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.8 }}
-          className="flex gap-4 mt-10"
+          className="flex justify-center mt-10 w-full"
         >
           <Magnet padding={60} magnetStrength={2.5}>
             <motion.button
@@ -191,16 +188,6 @@ const LandingPage = () => {
               >
                 <ArrowRight className="w-4 h-4" />
               </motion.div>
-            </motion.button>
-          </Magnet>
-
-          <Magnet padding={60} magnetStrength={2.5}>
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              whileHover={{ scale: 1.04 }}
-              className="px-8 py-3.5 rounded-2xl text-sm font-semibold glass text-foreground"
-            >
-              Watch Demo
             </motion.button>
           </Magnet>
         </motion.div>

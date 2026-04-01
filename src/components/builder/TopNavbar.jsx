@@ -1,12 +1,15 @@
 import { motion } from "framer-motion";
 import {
   Undo2, Redo2, Eye, Download, Monitor, Tablet, Smartphone,
-  Sparkles, Save
+  Sparkles, Save, Trash2
 } from "lucide-react";
 import GradientText from "@/components/reactbits/GradientText.jsx";
 import Magnet from "@/components/reactbits/Magnet.jsx";
+import { useBuilderStore } from "@/store/builderStore.js";
 
-const TopNavbar = ({ deviceMode, onDeviceChange }) => {
+const TopNavbar = () => {
+  const { deviceMode, setDeviceMode, previewMode, setPreviewMode, exportJSON, clearCanvas } = useBuilderStore();
+
   const devices = [
     { mode: "desktop", icon: Monitor, label: "Desktop" },
     { mode: "tablet", icon: Tablet, label: "Tablet" },
@@ -44,7 +47,7 @@ const TopNavbar = ({ deviceMode, onDeviceChange }) => {
       </Magnet>
 
       {/* Center: Device Size Picker */}
-      <div className="flex items-center gap-2">
+      <div className={`flex items-center gap-2 transition-opacity ${previewMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mr-2">
           Viewport
         </span>
@@ -52,7 +55,7 @@ const TopNavbar = ({ deviceMode, onDeviceChange }) => {
           {devices.map(({ mode, icon: Icon, label }) => (
             <motion.button
               key={mode}
-              onClick={() => onDeviceChange(mode)}
+              onClick={() => setDeviceMode(mode)}
               className={`relative px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all duration-300 ${
                 deviceMode === mode
                   ? "text-primary"
@@ -81,26 +84,25 @@ const TopNavbar = ({ deviceMode, onDeviceChange }) => {
 
       {/* Right Actions */}
       <div className="flex items-center gap-1">
-        <motion.button className="icon-btn" whileTap={{ scale: 0.85 }} title="Undo">
-          <Undo2 className="w-4 h-4" />
-        </motion.button>
-        <motion.button className="icon-btn" whileTap={{ scale: 0.85 }} title="Redo">
-          <Redo2 className="w-4 h-4" />
+        <motion.button className="icon-btn text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={clearCanvas} whileTap={{ scale: 0.85 }} title="Clear Canvas">
+          <Trash2 className="w-4 h-4" />
         </motion.button>
 
         <div className="w-px h-5 bg-border/40 mx-1.5" />
 
         <motion.button
-          className="icon-btn flex items-center gap-1.5 px-3 text-xs font-medium"
+          onClick={() => setPreviewMode(!previewMode)}
+          className={`icon-btn flex items-center gap-1.5 px-3 text-xs font-medium ${previewMode ? 'bg-primary/20 text-primary' : ''}`}
           whileTap={{ scale: 0.92 }}
           whileHover={{ scale: 1.03 }}
         >
           <Eye className="w-4 h-4" />
-          <span className="text-muted-foreground">Preview</span>
+          <span className={previewMode ? "text-primary" : "text-muted-foreground"}>{previewMode ? "Edit" : "Preview"}</span>
         </motion.button>
 
         <Magnet padding={50} magnetStrength={3}>
           <motion.button
+            onClick={exportJSON}
             whileTap={{ scale: 0.93 }}
             whileHover={{ scale: 1.05 }}
             className="ml-1 px-4 py-2 rounded-xl text-sm font-semibold text-primary-foreground flex items-center gap-2"
@@ -109,8 +111,8 @@ const TopNavbar = ({ deviceMode, onDeviceChange }) => {
               boxShadow: "0 0 20px -4px hsl(260 100% 68% / 0.5)",
             }}
           >
-            <Save className="w-3.5 h-3.5" />
-            Save
+            <Download className="w-3.5 h-3.5" />
+            Export JSON
           </motion.button>
         </Magnet>
       </div>
